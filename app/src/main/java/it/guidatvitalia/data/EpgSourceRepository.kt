@@ -27,7 +27,7 @@ class EpgSourceRepository {
                 connection.contentType?.contains("gzip", true) == true) {
                 GZIPInputStream(stream)
             } else stream
-            decoded.use { XmlTvParser.parse(it) }.also {
+            decoded.use { FreeToAirFilter.apply(XmlTvParser.parse(it)) }.also {
                 check(it.channels.isNotEmpty()) { "Il file non contiene canali XMLTV validi." }
                 check(it.programs.isNotEmpty()) { "Il file non contiene programmi XMLTV." }
             }
