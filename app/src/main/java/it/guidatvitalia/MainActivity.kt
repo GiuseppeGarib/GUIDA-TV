@@ -400,17 +400,20 @@ private fun TimelineScreen(
     val pixelsPerMinute = 1.35f
     val totalWidth = ((timelineEnd - timelineStart) / 60_000f * pixelsPerMinute).dp
     val now = System.currentTimeMillis()
+    val sharedScroll = rememberScrollState()
     Column(Modifier.fillMaxSize()) {
         Text("PALINSESTO ORIZZONTALE · scorri per esplorare le fasce orarie",
             Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("CANALE", Modifier.width(88.dp).padding(start = 8.dp), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-            Row(Modifier.width(totalWidth).horizontalScroll(rememberScrollState())) {
-                (6..29).forEach { hour ->
-                    Box(Modifier.width((60 * pixelsPerMinute).dp).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
-                        Text("${(hour % 24).toString().padStart(2, '0')}:00", fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Row(Modifier.weight(1f).fillMaxHeight().horizontalScroll(sharedScroll)) {
+                Row(Modifier.width(totalWidth).fillMaxHeight()) {
+                    (6..29).forEach { hour ->
+                        Box(Modifier.width((60 * pixelsPerMinute).dp).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
+                            Text("${(hour % 24).toString().padStart(2, '0')}:00", fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -424,36 +427,34 @@ private fun TimelineScreen(
                             fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Text(channel.channel.name, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
-                    Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState())) {
+                    Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(sharedScroll)) {
                         Box(Modifier.width(totalWidth).fillMaxHeight()) {
-                            Row(Modifier.fillMaxSize()) {
-                                val channelPrograms = programs.filter {
-                                    it.channelId == channel.channel.id && it.startMillis < timelineEnd &&
-                                        (it.stopMillis ?: Long.MAX_VALUE) > timelineStart
-                                }
-                                channelPrograms.forEach { program ->
-                                    val start = maxOf(program.startMillis, timelineStart)
-                                    val end = minOf(program.stopMillis ?: start + TimeUnit.MINUTES.toMillis(30), timelineEnd)
-                                    val left = ((start - timelineStart) / 60_000f * pixelsPerMinute).dp
-                                    val width = (((end - start).coerceAtLeast(TimeUnit.MINUTES.toMillis(12)) / 60_000f) * pixelsPerMinute).dp
-                                    Box(
-                                        Modifier.padding(start = left).width(width).fillMaxHeight().padding(end = 2.dp, top = 5.dp, bottom = 5.dp)
-                                            .clip(RoundedCornerShape(5.dp))
-                                            .background(if (program.startMillis <= now && (program.stopMillis ?: Long.MAX_VALUE) > now)
-                                                MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
-                                            .clickable { onProgram(channel.channel, program) }.padding(5.dp),
-                                        contentAlignment = Alignment.TopStart
-                                    ) {
-                                        Column {
-                                            Text(program.title, fontSize = 9.sp, fontWeight = FontWeight.SemiBold,
-                                                maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                            Text(timeText(program.startMillis), fontSize = 8.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
+                            val channelPrograms = programs.filter {
+                                it.channelId == channel.channel.id && it.startMillis < timelineEnd &&
+                                    (it.stopMillis ?: Long.MAX_VALUE) > timelineStart
+                            }
+                            channelPrograms.forEach { program ->
+                                val startMillis = maxOf(program.startMillis, timelineStart)
+                                val endMillis = minOf(program.stopMillis ?: startMillis + TimeUnit.MINUTES.toMillis(30), timelineEnd)
+                                val left = ((startMillis - timelineStart) / 60_000f * pixelsPerMinute).dp
+                                val width = (((endMillis - startMillis).coerceAtLeast(TimeUnit.MINUTES.toMillis(12)) / 60_000f) * pixelsPerMinute).dp
+                                Box(
+                                    Modifier.offset(x = left).width(width).fillMaxHeight().padding(end = 2.dp, top = 5.dp, bottom = 5.dp)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(if (program.startMillis <= now && (program.stopMillis ?: Long.MAX_VALUE) > now)
+                                            MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable { onProgram(channel.channel, program) }.padding(5.dp),
+                                    contentAlignment = Alignment.TopStart
+                                ) {
+                                    Column {
+                                        Text(program.title, fontSize = 9.sp, fontWeight = FontWeight.SemiBold,
+                                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        Text(timeText(program.startMillis), fontSize = 8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
-                            if (now in timelineStart until timelineEnd) {
+                            if (now >= timelineStart && now < timelineEnd) {
                                 val x = ((now - timelineStart) / 60_000f * pixelsPerMinute).dp
                                 Box(Modifier.offset(x = x).width(2.dp).fillMaxHeight().background(Color(0xFFE53935)))
                             }
