@@ -62,7 +62,7 @@ object FreeProgramMetadataRepository {
 
         if (showId > 0) {
             val show = if (includeCast) {
-                request("https://api.tvmaze.com/shows/$showId?embed=cast")
+                requestObject("https://api.tvmaze.com/shows/$showId?embed=cast")
             } else showSummary
             if (show != null) {
                 val image = show.optJSONObject("image")
@@ -95,7 +95,8 @@ object FreeProgramMetadataRepository {
             val character = entry.optJSONObject("character")?.optString("name").orEmpty()
             val image = person.optJSONObject("image")?.optString("medium")
             val wiki = wikipediaPerson(name)
-            result += CastMember(name, character, wiki?.second, wiki?.first, image)
+            val wikiUrl = wiki?.first ?: "https://it.wikipedia.org/w/index.php?search=" + URLEncoder.encode(name, "UTF-8")
+            result += CastMember(name, character, wiki?.second, wikiUrl, image)
         }
         return result
     }
@@ -121,7 +122,7 @@ object FreeProgramMetadataRepository {
 
     private fun wikipediaPerson(name: String): Pair<String, String?>? {
         val encoded = URLEncoder.encode(name, "UTF-8")
-        val search = request("https://it.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&utf8=1")
+        val search = requestObject("https://it.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&utf8=1")
         val pageTitle = search?.optJSONObject("query")?.optJSONArray("search")?.optJSONObject(0)
             ?.optString("title")?.takeIf { !it.isNullOrBlank() } ?: return null
         val summary = wikipediaSummary(pageTitle)
