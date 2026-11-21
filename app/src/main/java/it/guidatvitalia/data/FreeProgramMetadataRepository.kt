@@ -49,7 +49,7 @@ object FreeProgramMetadataRepository {
 
     private fun lookup(title: String, includeCast: Boolean): ProgramMetadata? {
         val encoded = URLEncoder.encode(title, "UTF-8")
-        val search = request("https://api.tvmaze.com/search/shows?q=$encoded")
+        val search = requestArray("https://api.tvmaze.com/search/shows?q=$encoded")
         val matches = search?.let { array ->
             (0 until array.length()).mapNotNull { array.optJSONObject(it) }
         }.orEmpty()
@@ -102,7 +102,7 @@ object FreeProgramMetadataRepository {
 
     private fun wikipediaFallback(title: String): ProgramMetadata? {
         val encoded = URLEncoder.encode(title, "UTF-8")
-        val search = request("https://it.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&utf8=1")
+        val search = requestObject("https://it.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&utf8=1")
         val first = search?.optJSONObject("query")?.optJSONArray("search")?.optJSONObject(0)
         val pageTitle = first?.optString("title")?.takeIf { !it.isNullOrBlank() } ?: return null
         if (!isReasonableMatch(title, pageTitle)) return null
@@ -132,7 +132,7 @@ object FreeProgramMetadataRepository {
 
     private fun wikipediaSummary(title: String): JSONObject? {
         val encoded = URLEncoder.encode(title.replace(' ', '_'), "UTF-8")
-        return request("https://it.wikipedia.org/api/rest_v1/page/summary/$encoded")
+        return requestObject("https://it.wikipedia.org/api/rest_v1/page/summary/$encoded")
     }
 
     private fun isReasonableMatch(query: String, result: String): Boolean {
@@ -151,8 +151,8 @@ object FreeProgramMetadataRepository {
     private fun shorten(value: String): String =
         if (value.length > 260) value.take(257).substringBeforeLast(' ') + "…" else value
 
-    private fun request(address: String): JSONObject? = requestRaw(address) as? JSONObject
-    private fun request(address: String, unused: Unit = Unit): JSONObject? = request(address)
+    private fun requestObject(address: String): JSONObject? = requestRaw(address) as? JSONObject
+    private fun requestArray(address: String): JSONArray? = requestRaw(address) as? JSONArray
 
     private fun requestRaw(address: String): Any? {
         val connection = (URL(address).openConnection() as HttpURLConnection).apply {
