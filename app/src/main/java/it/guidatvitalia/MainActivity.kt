@@ -139,7 +139,7 @@ private fun GuidaTvApp() {
         refreshEpg(sourceUrl)
     }
 
-    val allChannels = remember(epg) {
+    val allChannels = remember(epg, clockNow / 60_000) {
         val data = epg ?: EpgData(emptyList(), emptyList())
         val now = System.currentTimeMillis()
         data.channels.map { channel ->
