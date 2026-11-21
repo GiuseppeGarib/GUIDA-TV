@@ -37,6 +37,8 @@ import it.guidatvitalia.data.*
 import it.guidatvitalia.notifications.ReminderWorker
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.ZoneId
@@ -116,7 +118,7 @@ private fun GuidaTvApp() {
             status = "Download del palinsesto in corso…"
             try {
                 val data = EpgSourceRepository().download(url.trim())
-                EpgCache(context).use { it.replace(data) }
+                withContext(Dispatchers.IO) { EpgCache(context).use { it.replace(data) } }
                 epg = data
                 prefs.edit().putLong("last_epg_update", System.currentTimeMillis()).apply()
                 WorkScheduling.scheduleEpgRefresh(context, refreshInterval)
@@ -132,7 +134,7 @@ private fun GuidaTvApp() {
     }
 
     LaunchedEffect(Unit) {
-        val cached = EpgCache(context).use { it.read() }
+        val cached = withContext(Dispatchers.IO) { EpgCache(context).use { it.read() } }
         if (cached.channels.isNotEmpty()) {
             epg = cached
             status = "Archivio locale · ${cached.channels.size} canali in chiaro"
