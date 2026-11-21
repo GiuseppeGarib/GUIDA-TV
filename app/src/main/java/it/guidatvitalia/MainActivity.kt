@@ -111,7 +111,7 @@ private fun GuidaTvApp() {
                 EpgCache(context).use { it.replace(data) }
                 epg = data
                 prefs.edit().putLong("last_epg_update", System.currentTimeMillis()).apply()
-                WorkScheduling.scheduleEpgRefresh(context)
+                WorkScheduling.scheduleEpgRefresh(context, refreshInterval)
                 status = "Aggiornati ${data.channels.size} canali in chiaro · ${data.programs.size} programmi"
             } catch (error: Exception) {
                 status = "Aggiornamento non riuscito: ${error.message ?: "errore sconosciuto"}"
