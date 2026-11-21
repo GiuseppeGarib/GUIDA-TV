@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -413,6 +414,14 @@ private fun TimelineScreen(
     val totalWidth = ((timelineEnd - timelineStart) / 60_000f * pixelsPerMinute).dp
     val now = System.currentTimeMillis()
     val sharedScroll = rememberScrollState()
+    val density = LocalDensity.current
+    LaunchedEffect(date) {
+        if (date == LocalDate.now()) {
+            val minutesFromStart = ((System.currentTimeMillis() - timelineStart) / 60_000f - 60f).coerceAtLeast(0f)
+            val targetDp = minutesFromStart * pixelsPerMinute
+            sharedScroll.scrollTo((targetDp * density.density).toInt())
+        } else sharedScroll.scrollTo(0)
+    }
     Column(Modifier.fillMaxSize()) {
         Text("PALINSESTO ORIZZONTALE · scorri per esplorare le fasce orarie",
             Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontSize = 10.sp,
