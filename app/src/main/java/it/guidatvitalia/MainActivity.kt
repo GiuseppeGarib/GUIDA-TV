@@ -431,6 +431,7 @@ private fun TimelineScreen(
     val sharedScroll = rememberScrollState()
     val density = LocalDensity.current
     LaunchedEffect(date) {
+        withFrameNanos { }
         if (date == LocalDate.now()) {
             val minutesFromStart = ((System.currentTimeMillis() - timelineStart) / 60_000f - 60f).coerceAtLeast(0f)
             val targetDp = minutesFromStart * pixelsPerMinute
