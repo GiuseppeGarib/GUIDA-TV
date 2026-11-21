@@ -52,13 +52,30 @@ private val lcn = mapOf(
     "20" to 20, "rai 4" to 21, "rai 5" to 23, "rai movie" to 24,
     "rai premium" to 25, "rai news 24" to 48
 )
-private val demoChannels = listOf(
-    TvChannel(1,"","Rai 1","Generalista"), TvChannel(2,"","Rai 2","Generalista"),
-    TvChannel(3,"","Rai 3","Generalista"), TvChannel(4,"","Rete 4","Generalista"),
-    TvChannel(5,"","Canale 5","Generalista"), TvChannel(6,"","Italia 1","Generalista"),
-    TvChannel(7,"","La7","Generalista"), TvChannel(8,"","TV8","Generalista"),
-    TvChannel(9,"","NOVE","Intrattenimento"), TvChannel(20,"","20","Cinema e serie")
-)
+private const val DEFAULT_EPG_URL = "https://epgshare01.online/epgshare01/epg_ripper_IT1.xml.gz"
+
+// Lista prudenziale dei canali italiani in chiaro riconosciuti.
+private val freeToAirChannelIds = setOf(
+    "20", "27", "boing", "canale5", "cartoonito", "cielo", "cine34",
+    "dmax", "focus", "foodnetwork", "frisbee", "giallo", "hgtv",
+    "iris", "italia1", "k2", "la5", "la7", "la7cinema", "la7d",
+    "mediasetextra", "motortrend", "nove", "qvc", "rai1", "rai2",
+    "rai3", "rai4", "rai5", "raigulp", "raimovie", "rainews24",
+    "raipremium", "raisc uola", "raisc uola", "raiscuola", "raisport",
+    "raistoria", "raiyoyo", "realtime", "rete4", "sanmarinortv",
+    "sportitalia", "super", "supertennis", "topcrime", "tv8",
+    "warnertv", "tgcom", "tg24primopiano"
+).map(::normalize).toSet()
+
+private fun isFreeToAir(channel: EpgChannel): Boolean {
+    fun variants(value: String): Set<String> {
+        val base = normalize(value).removeSuffix("it")
+        val noHd = base.replace(Regex("hd\\d*$"), "")
+        val noLcn = noHd.replace(Regex("\\d{3}$"), "")
+        return setOf(base, noHd, noLcn)
+    }
+    return (variants(channel.name) + variants(channel.id)).any { it in freeToAirChannelIds }
+}
 private fun formatTime(ms: Long): String = SimpleDateFormat("HH:mm", Locale.ITALY).format(Date(ms))
 private fun normalize(s: String) = s.lowercase(Locale.ITALY).replace(Regex("[^a-z0-9]"), "")
 
@@ -82,7 +99,7 @@ private fun GuidaTvApp() {
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var favorites by remember { mutableStateOf(prefs.getStringSet("favorites", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()) }
     var darkMode by remember { mutableStateOf(prefs.getBoolean("dark", false)) }
-    var sourceUrl by remember { mutableStateOf(prefs.getString("epg_url", "") ?: "") }
+    var sourceUrl by remember { mutableStateOf((prefs.getString("epg_url", null) ?: DEFAULT_EPG_URL).ifBlank { DEFAULT_EPG_URL }) }
     var sourceDraft by remember { mutableStateOf(sourceUrl) }
     var epg by remember { mutableStateOf<EpgData?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -99,9 +116,13 @@ private fun GuidaTvApp() {
         val cached = EpgCache(context).use { it.read() }
         if (cached.channels.isNotEmpty()) {
             epg = cached
-            status = "Archivio offline · ${cached.channels.size} canali · ${cached.programs.size} programmi"
-        } else status = "Nessun palinsesto: configura una sorgente XMLTV"
-        if (sourceUrl.isNotBlank()) WorkScheduling.scheduleEpgRefresh(context)
+            status = "Archivio offline · ${cached.channels.count(::isFreeToAir)} canali in chiaro"
+        } else status = "Scaricamento del primo palinsesto…"
+        if (sourceUrl.isNotBlank()) {
+            prefs.edit().putString("epg_url", sourceUrl).apply()
+            WorkScheduling.scheduleEpgRefresh(context)
+            refreshEpg(sourceUrl)
+        }
     }
 
     fun refreshEpg(url: String) {
@@ -124,9 +145,9 @@ private fun GuidaTvApp() {
 
     val channels = remember(epg) {
         val data = epg
-        if (data == null) demoChannels else {
+        if (data == null) emptyList() else {
             val now = System.currentTimeMillis()
-            data.channels.map { ch ->
+            data.channels.filter(::isFreeToAir).map { ch ->
                 val programs = data.programs.filter { it.channelId == ch.id }
                 val current = programs.firstOrNull { it.startMillis <= now && (it.stopMillis ?: Long.MAX_VALUE) > now }
                 val next = programs.firstOrNull { it.startMillis > now }
@@ -191,6 +212,17 @@ private fun GuidaTvApp() {
                         epg?.programs?.any { p -> p.channelId == it.id && p.title.contains(query, true) } == true)
                 }
                 LazyColumn(contentPadding = PaddingValues(bottom = 12.dp)) {
+                    if (filtered.isEmpty()) item {
+                        Text(
+                            if (loading) "Caricamento dei palinsesti…" else if (epg == null)
+                                "La guida si sta inizializzando. Verifica la connessione Internet."
+                            else if (channels.isEmpty())
+                                "Nessun canale in chiaro riconosciuto nella sorgente."
+                            else "Nessun risultato. Prova un'altra ricerca.",
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     items(filtered, key = { it.id.ifBlank { it.number.toString() } }) { channel ->
                         ChannelRow(channel, channel.number in favorites,
                             onFavorite = {
@@ -277,10 +309,12 @@ private fun GuidaTvApp() {
                         }
                         HorizontalDivider()
                         Text("Sorgente palinsesti XMLTV", fontWeight = FontWeight.SemiBold)
+                        Text("Sorgente predefinita: EPGShare Italia. L'app mostra soltanto i canali in chiaro riconosciuti.",
+                            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         OutlinedTextField(value = sourceDraft, onValueChange = { sourceDraft = it },
                             modifier = Modifier.fillMaxWidth(), placeholder = { Text("https://…/guida.xml o .xml.gz") },
                             singleLine = true)
-                        Text("Inserisci una sorgente XMLTV HTTPS che sei autorizzato a consultare. I palinsesti non sono inclusi nell'app: i diritti sui dati dipendono dal fornitore.",
+                        Text("Feed XMLTV gratuito di terze parti. Il feed include anche canali a pagamento, che vengono esclusi dalla guida. Disponibilità e diritti dei palinsesti dipendono dal fornitore.",
                             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         prefs.getLong("last_epg_update", 0L).takeIf { it > 0 }?.let {
                             Text("Ultimo aggiornamento: ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.ITALY).format(Date(it))}",
