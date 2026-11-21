@@ -19,6 +19,10 @@ object FreeToAirFilter {
         "sportitalia", "super", "supertennis", "topcrime", "tv8", "warnertv",
         "almatv", "radio105", "r101", "deejaytv", "radioitaliatv", "bomchannel",
         "solocalcio", "donnasporttv", "gm24", "france24", "rtvunicasanmarino",
+        "canale122", "lineagem", "artein", "deluxe", "padrepiotv", "fascinotv", "primaset",
+        "eqtuv", "tesorychannel", "canale165", "orlertv", "canale168", "canale169", "primafree",
+        "apchannel", "itchannel", "radioromanetwork", "italiasera", "amicinetwork", "teleshopping",
+        "babel", "paroledidvita", "bejoykids", "248tv", "matrixitalia", "momentotv",
         "7gold", "antenna3", "canale21", "telecapri", "telecolor", "telecity",
         "telefriuli", "telelombardia", "teleuniverso", "televenezia", "telenorba",
         "teleromagna", "primocanale", "trm", "teleone",
@@ -41,7 +45,11 @@ object FreeToAirFilter {
             "dmax" to 52, "mediasetextra" to 55, "hgtv" to 56, "motortrend" to 59,
             "sportitalia" to 60, "solocalcio" to 61, "donnasporttv" to 62, "gm24" to 63,
             "supertennis" to 64, "almatv" to 65, "radio105" to 66, "r101" to 67,
-            "bomchannel" to 68, "deejaytv" to 69, "radioitaliatv" to 70
+            "bomchannel" to 68, "deejaytv" to 69, "radioitaliatv" to 70,
+            "canale122" to 122, "lineagem" to 132, "artein" to 133, "deluxe" to 139,
+            "padrepiotv" to 145, "fascinotv" to 147, "primaset" to 149, "eqtuv" to 151,
+            "tesorychannel" to 152, "canale165" to 165, "orlertv" to 166, "canale168" to 168,
+            "canale169" to 169, "primafree" to 170
         )
         return keys.firstNotNullOfOrNull { lcn[it] } ?: 1000
     }
