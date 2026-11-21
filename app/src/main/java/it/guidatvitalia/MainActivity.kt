@@ -1,6 +1,10 @@
 package it.guidatvitalia
 
+import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -229,14 +233,23 @@ private fun GuidaTvApp() {
                                             Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                         TextButton(onClick = {
-                                            val delayMs = (p.startMillis - System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(5)).coerceAtLeast(0)
-                                            val data = Data.Builder().putString("program_title", p.title)
-                                                .putString("channel_name", channel.name)
-                                                .putInt("notification_id", (p.channelId + p.startMillis).hashCode()).build()
-                                            val request = OneTimeWorkRequestBuilder<ReminderWorker>()
-                                                .setInputData(data).setInitialDelay(delayMs, TimeUnit.MILLISECONDS).build()
-                                            WorkManager.getInstance(context).enqueue(request)
-                                            status = "Promemoria impostato: ${p.title}"
+                                            val permitted = Build.VERSION.SDK_INT < 33 ||
+                                                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                                            if (!permitted) {
+                                                (context as? Activity)?.requestPermissions(
+                                                    arrayOf(Manifest.permission.POST_NOTIFICATIONS), 703
+                                                )
+                                                status = "Consenti le notifiche e premi di nuovo Promemoria"
+                                            } else {
+                                                val delayMs = (p.startMillis - System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(5)).coerceAtLeast(0)
+                                                val data = Data.Builder().putString("program_title", p.title)
+                                                    .putString("channel_name", channel.name)
+                                                    .putInt("notification_id", (p.channelId + p.startMillis).hashCode()).build()
+                                                val request = OneTimeWorkRequestBuilder<ReminderWorker>()
+                                                    .setInputData(data).setInitialDelay(delayMs, TimeUnit.MILLISECONDS).build()
+                                                WorkManager.getInstance(context).enqueue(request)
+                                                status = "Promemoria impostato: ${p.title}"
+                                            }
                                         }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)) {
                                             Text("Imposta promemoria (5 min prima)")
                                         }
