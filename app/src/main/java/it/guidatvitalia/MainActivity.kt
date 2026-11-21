@@ -156,7 +156,8 @@ private fun GuidaTvApp() {
             .sortedBy { channelsById[it.channelId]?.name?.let(::channelNumber) ?: 9999 }
     }
     val selectedDayPrograms = remember(epg, selectedDate) {
-        val (start, end) = dayBounds(selectedDate)
+        val start = dayBounds(selectedDate).first + TimeUnit.HOURS.toMillis(6)
+        val end = start + TimeUnit.HOURS.toMillis(24)
         epg?.programs.orEmpty().filter { it.startMillis < end && (it.stopMillis ?: Long.MAX_VALUE) > start }
             .sortedBy { it.startMillis }
     }
@@ -318,6 +319,8 @@ private fun GuidaTvApp() {
                     if (!permitted) {
                         (context as? Activity)?.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 703)
                         status = "Autorizza le notifiche e imposta nuovamente il promemoria."
+                    } else if (program.startMillis <= System.currentTimeMillis()) {
+                        status = "Il programma è già iniziato: non è possibile impostare un promemoria."
                     } else {
                         val delay = (program.startMillis - System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(5)).coerceAtLeast(0)
                         val data = Data.Builder().putString("program_title", program.title)
