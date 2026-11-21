@@ -1,9 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFFFFF" android:pathData="M25,31h58c5,0 9,4 9,9v31c0,5 -4,9 -9,9h-58c-5,0 -9,-4 -9,-9v-31c0,-5 4,-9 9,-9z"/>
-    <path android:fillColor="#00796B" android:pathData="M28,39h52v30h-52z"/>
-    <path android:fillColor="#FFB74D" android:pathData="M39,21l15,13 15,-13h7l-18,18h-8l-18,-18z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M38,47h32v4h-32zM38,56h21v4h-21z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M39,82h30v4h-30z"/>
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Antenna -->
+    <path android:fillColor="#DCEBFF" android:pathData="M42,20 L25,8 L29,5 L49,20 Z M66,20 L83,5 L87,8 L70,22 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M21,5a4,4 0,1 0,8 0a4,4 0,1 0,-8 0 M79,5a4,4 0,1 0,8 0a4,4 0,1 0,-8 0"/>
+    <!-- TV casing and screen -->
+    <path android:fillColor="#07172D" android:pathData="M13,20 Q13,15 19,15 H89 Q95,15 95,21 V79 Q95,85 89,85 H19 Q13,85 13,79 Z"/>
+    <path android:fillColor="#D8E8F8" android:pathData="M16,21 Q16,18 20,18 H88 Q92,18 92,22 V77 Q92,82 88,82 H20 Q16,82 16,77 Z"/>
+    <path android:fillColor="#061B3A" android:pathData="M19,23 H89 V75 H19 Z"/>
+    <!-- Color bands -->
+    <path android:fillColor="#1677FF" android:pathData="M20,24 H32 V74 H20 Z"/>
+    <path android:fillColor="#00B8E8" android:pathData="M32,24 H43 V74 H32 Z"/>
+    <path android:fillColor="#20C66B" android:pathData="M43,24 H54 V74 H43 Z"/>
+    <path android:fillColor="#F6D52D" android:pathData="M54,24 H65 V74 H54 Z"/>
+    <path android:fillColor="#FF8A24" android:pathData="M65,24 H76 V74 H65 Z"/>
+    <path android:fillColor="#EF3D36" android:pathData="M76,24 H88 V74 H76 Z"/>
+    <!-- TV lettering -->
+    <path android:fillColor="#06152C" android:pathData="M26,34 H54 V41 H44 V67 H36 V41 H26 Z M55,34 H64 L70,55 L77,34 H86 L75,67 H66 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M24,32 H53 V39 H43 V65 H35 V39 H24 Z M53,32 H62 L69,53 L76,32 H85 L74,65 H65 Z"/>
+    <!-- Stand -->
+    <path android:fillColor="#AFC7E4" android:pathData="M48,85 H60 V91 H48 Z M39,91 H69 V95 H39 Z"/>
+    <!-- Remote in foreground -->
+    <path android:fillColor="#050D1A" android:pathData="M78,65 Q78,62 82,63 L96,68 Q99,69 98,73 L91,96 Q90,99 86,98 L73,93 Q70,92 71,88 Z"/>
+    <path android:fillColor="#263B56" android:pathData="M80,68 L94,72 L87,93 L75,89 Z"/>
+    <path android:fillColor="#F0443E" android:pathData="M84,70a2.5,2.5 0,1 0,5 0a2.5,2.5 0,1 0,-5 0"/>
+    <path android:fillColor="#E7F0FA" android:pathData="M79,77a1.4,1.4 0,1 0,2.8 0a1.4,1.4 0,1 0,-2.8 0 M86,79a1.4,1.4 0,1 0,2.8 0a1.4,1.4 0,1 0,-2.8 0 M77,84a1.4,1.4 0,1 0,2.8 0a1.4,1.4 0,1 0,-2.8 0 M84,86a1.4,1.4 0,1 0,2.8 0a1.4,1.4 0,1 0,-2.8 0"/>
 </vector>
