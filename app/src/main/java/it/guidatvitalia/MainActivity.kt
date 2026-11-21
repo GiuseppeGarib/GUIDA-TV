@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -638,8 +639,12 @@ private fun ProgramDetailsDialog(
         title = { Text(program.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("${channel.name} · ${SimpleDateFormat("EEEE d MMMM", Locale.ITALY).format(Date(program.startMillis))} · ${timeText(program.startMillis)} – ${program.stopMillis?.let(::timeText) ?: "orario non disponibile"}",
-                    fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ChannelLogo(channel, Modifier.size(25.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${channel.name} · ${SimpleDateFormat("EEEE d MMMM", Locale.ITALY).format(Date(program.startMillis))} · ${timeText(program.startMillis)} – ${program.stopMillis?.let(::timeText) ?: "orario non disponibile"}",
+                        fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                }
                 ProgramMetadataStrip(program, compact = false, includeCast = true)
                 program.category?.takeIf { it.isNotBlank() }?.let { Text(it, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp) }
                 program.description?.takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 13.sp) }
@@ -682,7 +687,7 @@ private fun SettingsScreen(
                 Modifier.padding(vertical = 6.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(value = tmdbApiKey, onValueChange = onTmdbApiKey, modifier = Modifier.fillMaxWidth(),
                 label = { Text("Chiave API TMDB") }, singleLine = true)
-            Text("La chiave viene conservata nelle impostazioni locali del dispositivo e non viene pubblicata nel repository. I dati e le immagini sono forniti da TMDB e Wikipedia.",
+            Text("La chiave viene conservata nelle impostazioni locali del dispositivo e non viene pubblicata nel repository. Dati e immagini sono forniti da TMDB e Wikipedia. This product uses the TMDB API but is not endorsed or certified by TMDB.",
                 Modifier.padding(vertical = 5.dp), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             HorizontalDivider()
             Text("PALINSESTI XMLTV", Modifier.padding(top = 12.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
