@@ -101,7 +101,9 @@ private fun GuidaTvApp() {
     var favoritePrograms by remember {
         mutableStateOf(prefs.getStringSet("favorite_programs", emptySet())?.toSet() ?: emptySet())
     }
-    var themeMode by remember { mutableStateOf(prefs.getString("theme_mode", "system") ?: "system") }
+    var themeMode by remember {
+        mutableStateOf(prefs.getString("theme_mode", null) ?: if (prefs.getBoolean("dark", false)) "dark" else "system")
+    }
     var sourceUrl by remember { mutableStateOf((prefs.getString("epg_url", null) ?: DEFAULT_EPG_URL).ifBlank { DEFAULT_EPG_URL }) }
     var sourceDraft by remember { mutableStateOf(sourceUrl) }
     var eveningTime by remember { mutableIntStateOf(prefs.getInt("evening_hour", 20)) }
@@ -149,6 +151,17 @@ private fun GuidaTvApp() {
                 programs.firstOrNull { it.startMillis <= now && (it.stopMillis ?: Long.MAX_VALUE) > now },
                 programs.firstOrNull { it.startMillis > now })
         }.sortedWith(compareBy<ChannelView> { it.number }.thenBy { it.channel.name })
+    }
+    LaunchedEffect(allChannels) {
+        if (allChannels.isNotEmpty() && !prefs.getBoolean("legacy_favorites_migrated", false)) {
+            val legacyNumbers = prefs.getStringSet("favorites", emptySet()).orEmpty()
+            val migrated = allChannels.filter { it.number.toString() in legacyNumbers }.map { it.channel.id }.toSet()
+            if (migrated.isNotEmpty()) {
+                favoriteChannels = favoriteChannels + migrated
+                prefs.edit().putStringSet("favorite_channels", favoriteChannels).apply()
+            }
+            prefs.edit().putBoolean("legacy_favorites_migrated", true).apply()
+        }
     }
     val channelsById = remember(epg) { epg?.channels?.associateBy { it.id }.orEmpty() }
     val now = clockNow
