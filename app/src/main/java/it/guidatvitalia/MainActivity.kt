@@ -89,19 +89,6 @@ private fun GuidaTvApp() {
         surface = Color.White, background = Color(0xFFF3F5F6)
     )
 
-    LaunchedEffect(Unit) {
-        val cached = EpgCache(context).use { it.read() }
-        if (cached.channels.isNotEmpty()) {
-            epg = cached
-            status = "Archivio offline · ${cached.channels.size} canali in chiaro"
-        } else status = "Scaricamento del primo palinsesto…"
-        if (sourceUrl.isNotBlank()) {
-            prefs.edit().putString("epg_url", sourceUrl).apply()
-            WorkScheduling.scheduleEpgRefresh(context)
-            refreshEpg(sourceUrl)
-        }
-    }
-
     fun refreshEpg(url: String) {
         if (url.isBlank()) { status = "Inserisci un indirizzo XMLTV nelle impostazioni"; return }
         scope.launch {
@@ -119,6 +106,21 @@ private fun GuidaTvApp() {
             } finally { loading = false }
         }
     }
+
+
+    LaunchedEffect(Unit) {
+        val cached = EpgCache(context).use { it.read() }
+        if (cached.channels.isNotEmpty()) {
+            epg = cached
+            status = "Archivio offline · ${cached.channels.size} canali in chiaro"
+        } else status = "Scaricamento del primo palinsesto…"
+        if (sourceUrl.isNotBlank()) {
+            prefs.edit().putString("epg_url", sourceUrl).apply()
+            WorkScheduling.scheduleEpgRefresh(context)
+            refreshEpg(sourceUrl)
+        }
+    }
+
 
     val channels = remember(epg) {
         val data = epg
