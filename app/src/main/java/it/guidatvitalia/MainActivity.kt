@@ -35,6 +35,7 @@ import androidx.work.WorkManager
 import it.guidatvitalia.data.*
 import it.guidatvitalia.notifications.ReminderWorker
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.ZoneId
@@ -48,7 +49,7 @@ private val channelNumbers = mapOf(
     "rai1" to 1, "rai2" to 2, "rai3" to 3, "rete4" to 4, "canale5" to 5,
     "italia1" to 6, "la7" to 7, "tv8" to 8, "nove" to 9, "20" to 20,
     "rai4" to 21, "iris" to 22, "rai5" to 23, "raimovie" to 24,
-    "raipremium" to 25, "cielo" to 26, " twentyseven" to 27, "la7d" to 29,
+    "raipremium" to 25, "cielo" to 26, "27" to 27, "la7d" to 29,
     "la5" to 30, "real time" to 31, "food network" to 33, "giallo" to 38,
     "top crime" to 39, "boing" to 40, "cartoonito" to 46, "rainews24" to 48,
     "focus" to 35, "dmax" to 52, "mediaset extra" to 55, "cine34" to 34
@@ -83,6 +84,7 @@ private fun GuidaTvApp() {
     val scope = rememberCoroutineScope()
     var epg by remember { mutableStateOf<EpgData?>(null) }
     var loading by remember { mutableStateOf(false) }
+    var clockNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var status by remember { mutableStateOf("Inizializzazione archivio…") }
     var screen by remember { mutableStateOf(Screen.GUIDE) }
     var search by remember { mutableStateOf("") }
@@ -120,6 +122,10 @@ private fun GuidaTvApp() {
     }
 
     LaunchedEffect(Unit) {
+        while (true) { delay(30_000); clockNow = System.currentTimeMillis() }
+    }
+
+    LaunchedEffect(Unit) {
         val cached = EpgCache(context).use { it.read() }
         if (cached.channels.isNotEmpty()) {
             epg = cached
@@ -141,7 +147,7 @@ private fun GuidaTvApp() {
         }.sortedWith(compareBy<ChannelView> { it.number }.thenBy { it.channel.name })
     }
     val channelsById = remember(epg) { epg?.channels?.associateBy { it.id }.orEmpty() }
-    val now = System.currentTimeMillis()
+    val now = clockNow
     val currentPrograms = remember(epg, now / 60_000) {
         epg?.programs.orEmpty().filter { it.startMillis <= now && (it.stopMillis ?: Long.MAX_VALUE) > now }
             .sortedBy { channelsById[it.channelId]?.name?.let(::channelNumber) ?: 9999 }
@@ -334,7 +340,7 @@ private fun DateSelector(date: LocalDate, onDate: (LocalDate) -> Unit) {
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        (-1L..6L).forEach { offset ->
+        (-7L..7L).forEach { offset ->
             val day = LocalDate.now().plusDays(offset)
             FilterChip(
                 selected = day == date, onClick = { onDate(day) },
