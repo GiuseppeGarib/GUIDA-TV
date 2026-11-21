@@ -31,7 +31,7 @@ object FreeToAirFilter {
 
     /** LCN nazionale e principali alias; le locali senza posizione certa restano in coda. */
     fun lcnFor(channel: EpgChannel): Int {
-        val keys = variants(channel.name) + variants(channel.id)
+        val keys = sequenceOf(channel.name, channel.id).flatMap { variants(it).asSequence() }.toList()
         val lcn = mapOf(
             "rai1" to 1, "rai2" to 2, "rai3" to 3, "rete4" to 4, "canale5" to 5,
             "italia1" to 6, "la7" to 7, "tv8" to 8, "nove" to 9,
@@ -55,13 +55,30 @@ object FreeToAirFilter {
     }
 
     fun apply(data: EpgData): EpgData {
-        val channels = data.channels.filter(::isAllowed)
+        val candidates = data.channels.filter(::isAllowed)
+        val programCounts = data.programs.groupingBy { it.channelId }.eachCount()
+        // Un solo record per LCN nazionale; i servizi locali senza LCN restano distinti.
+        val channels = candidates.groupBy { lcnFor(it) }.values.flatMap { group ->
+            if (group.size == 1 || lcnFor(group.first()) == 1000) group
+            else listOf(group.maxWithOrNull(compareBy<EpgChannel> { channelQuality(it, programCounts) }
+                .thenBy { it.name.length })!!)
+        }.distinctBy { it.id }
+            .sortedWith(compareBy<EpgChannel> { lcnFor(it) }.thenBy { it.name.lowercase(Locale.ITALY) })
         val ids = channels.mapTo(hashSetOf()) { it.id }
         return EpgData(channels, data.programs.filter { it.channelId in ids })
     }
 
+    private fun channelQuality(channel: EpgChannel, programCounts: Map<String, Int>): Int {
+        val name = normalize(channel.name)
+        val id = normalize(channel.id)
+        val canonical = sequenceOf(channel.name, channel.id)
+            .flatMap { variants(it).asSequence() }.firstOrNull { it in allowed }
+        return (if (canonical == name || canonical == id) 100 else 0) +
+            (if (!channel.icon.isNullOrBlank()) 20 else 0) + minOf(programCounts[channel.id] ?: 0, 50)
+    }
+
     private fun isAllowed(channel: EpgChannel): Boolean =
-        (variants(channel.name) + variants(channel.id)).any { it in allowed }
+        sequenceOf(channel.name, channel.id).flatMap { variants(it).asSequence() }.any { it in allowed }
 
     private fun variants(value: String): Set<String> {
         val base = normalize(value).removeSuffix("it")
