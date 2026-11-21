@@ -9,7 +9,7 @@ import java.util.Locale
  */
 object FreeToAirFilter {
     private val allowed = setOf(
-        "20", "27", "boing", "canale5", "cartoonito", "cielo", "cine34", "canaleitalia", "canaleitalia83", "canaleitalia84",
+        "20", "20mediaset", "27", "twentyseven", "27twentyseven", "boing", "canale5", "cartoonito", "cielo", "cine34", "canaleitalia", "canaleitalia83", "canaleitalia84",
         "dmax", "focus", "foodnetwork", "frisbee", "giallo", "hgtv", "hse24",
         "iris", "italia1", "k2", "la5", "la7", "la7cinema", "la7d",
         "mediasetextra", "motortrend", "nove", "qvc", "qvc2", "tgcom24", "tv2000", "telepace", "radioitalia", "rtl1025", "byoblu", "il61",
