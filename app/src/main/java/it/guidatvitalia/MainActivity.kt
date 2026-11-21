@@ -3,6 +3,8 @@ package it.guidatvitalia
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -29,6 +31,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalDensity
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
@@ -61,7 +65,7 @@ private val channelNumbers = mapOf(
     "sportitalia" to 60, "supertennis" to 64
 )
 private fun normalized(value: String) = value.lowercase(Locale.ITALY).filter { it.isLetterOrDigit() }
-private fun channelNumber(name: String): Int = channelNumbers[normalized(name).replace(Regex("hd\\d*$"), "")] ?: 1000
+private fun channelNumber(name: String): Int = FreeToAirFilter.lcnFor(EpgChannel("", name))
 private fun timeText(millis: Long): String = SimpleDateFormat("HH:mm", Locale.ITALY).format(Date(millis))
 private fun dateText(date: LocalDate): String = date.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.ITALY))
 private fun dayBounds(date: LocalDate): Pair<Long, Long> {
@@ -107,6 +111,7 @@ private fun GuidaTvApp() {
         mutableStateOf(prefs.getString("theme_mode", null) ?: if (prefs.getBoolean("dark", false)) "dark" else "system")
     }
     var sourceUrl by remember { mutableStateOf((prefs.getString("epg_url", null) ?: DEFAULT_EPG_URL).ifBlank { DEFAULT_EPG_URL }) }
+    var tmdbApiKey by remember { mutableStateOf(prefs.getString("tmdb_api_key", "").orEmpty()) }
     var sourceDraft by remember { mutableStateOf(sourceUrl) }
     var eveningTime by remember { mutableIntStateOf(prefs.getInt("evening_hour", 20)) }
     var refreshInterval by remember { mutableIntStateOf(prefs.getInt("refresh_hours", 12)) }
@@ -294,6 +299,7 @@ private fun GuidaTvApp() {
                         onProgram = { channel, program -> selectedChannel = channel; selectedProgram = program })
                     Screen.SETTINGS -> SettingsScreen(
                         sourceDraft = sourceDraft, onSource = { sourceDraft = it },
+                        tmdbApiKey = tmdbApiKey, onTmdbApiKey = { tmdbApiKey = it; prefs.edit().putString("tmdb_api_key", it.trim()).apply() },
                         themeMode = themeMode, onTheme = {
                             themeMode = it; prefs.edit().putString("theme_mode", it).apply()
                         },
@@ -398,7 +404,12 @@ private fun ChannelRow(item: ChannelView, favorite: Boolean, onFavorite: () -> U
             Text(if (item.number < 1000) item.number.toString().padStart(2, '0') else "·",
                 Modifier.width(34.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
             Column(Modifier.weight(1f)) {
-                Text(item.channel.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ChannelLogo(item.channel, Modifier.size(25.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(item.channel.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+                (item.current ?: item.next)?.let { ProgramMetadataStrip(it, compact = true) }
                 if (item.current != null) {
                     Text("${timeText(item.current.startMillis)}  ${item.current.title}",
                         fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -462,7 +473,11 @@ private fun TimelineScreen(
                     Column(Modifier.width(88.dp).padding(start = 8.dp, end = 4.dp)) {
                         Text(if (channel.number < 1000) channel.number.toString() else "·",
                             fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                        Text(channel.channel.name, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ChannelLogo(channel.channel, Modifier.size(20.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(channel.channel.name, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                     Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(sharedScroll)) {
                         Box(Modifier.width(totalWidth).fillMaxHeight()) {
@@ -585,9 +600,14 @@ private fun ProgramRow(
             Column(Modifier.width(68.dp)) {
                 Text(timeText(program.startMillis), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text(SimpleDateFormat("EEE d MMM", Locale.ITALY).format(Date(program.startMillis)), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(channel.name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ChannelLogo(channel, Modifier.size(18.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text(channel.name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                }
             }
             Column(Modifier.weight(1f)) {
+                ProgramMetadataStrip(program, compact = true)
                 Text(program.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 program.category?.takeIf { it.isNotBlank() }?.let {
                     Text(it, fontSize = 9.sp, color = MaterialTheme.colorScheme.primary)
@@ -620,6 +640,7 @@ private fun ProgramDetailsDialog(
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Text("${channel.name} · ${SimpleDateFormat("EEEE d MMMM", Locale.ITALY).format(Date(program.startMillis))} · ${timeText(program.startMillis)} – ${program.stopMillis?.let(::timeText) ?: "orario non disponibile"}",
                     fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                ProgramMetadataStrip(program, compact = false, includeCast = true)
                 program.category?.takeIf { it.isNotBlank() }?.let { Text(it, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp) }
                 program.description?.takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 13.sp) }
                 if (program.description.isNullOrBlank()) Text("Descrizione non fornita dalla sorgente EPG.", fontSize = 12.sp)
@@ -640,6 +661,7 @@ private fun ProgramDetailsDialog(
 @Composable
 private fun SettingsScreen(
     sourceDraft: String, onSource: (String) -> Unit,
+    tmdbApiKey: String, onTmdbApiKey: (String) -> Unit,
     themeMode: String, onTheme: (String) -> Unit,
     eveningTime: Int, onEveningTime: (Int) -> Unit,
     refreshInterval: Int, onRefreshInterval: (Int) -> Unit,
@@ -654,6 +676,14 @@ private fun SettingsScreen(
                     Text(label, fontSize = 13.sp)
                 }
             }
+            HorizontalDivider()
+            Text("LOCANDINE, VOTI E CAST", Modifier.padding(top = 12.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("Inserisci la tua chiave API gratuita TMDB. L'app mostrerà il voto medio degli utenti e, quando disponibili, locandine e informazioni sul cast. Il voto è distinto da quello della critica professionale.",
+                Modifier.padding(vertical = 6.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(value = tmdbApiKey, onValueChange = onTmdbApiKey, modifier = Modifier.fillMaxWidth(),
+                label = { Text("Chiave API TMDB") }, singleLine = true)
+            Text("La chiave viene conservata nelle impostazioni locali del dispositivo e non viene pubblicata nel repository. I dati e le immagini sono forniti da TMDB e Wikipedia.",
+                Modifier.padding(vertical = 5.dp), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             HorizontalDivider()
             Text("PALINSESTI XMLTV", Modifier.padding(top = 12.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Text("Sorgente gratuita predefinita: EPGShare Italia. La guida applica un filtro ai canali italiani in chiaro riconosciuti; l'elenco può variare in base ai dati del feed.",
