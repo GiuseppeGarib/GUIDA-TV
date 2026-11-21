@@ -28,17 +28,17 @@ data class ProgramMetadata(
 object TmdbMetadataRepository {
     private val cache = mutableMapOf<String, ProgramMetadata?>()
 
-    suspend fun find(title: String, apiKey: String): ProgramMetadata? = withContext(Dispatchers.IO) {
+    suspend fun find(title: String, apiKey: String, includeCast: Boolean = false): ProgramMetadata? = withContext(Dispatchers.IO) {
         val cleanKey = apiKey.trim()
         if (cleanKey.isBlank() || title.isBlank()) return@withContext null
-        val cacheKey = title.lowercase()
+        val cacheKey = title.lowercase() + if (includeCast) "|cast" else "|basic"
         synchronized(cache) { if (cache.containsKey(cacheKey)) return@withContext cache[cacheKey] }
-        val result = runCatching { lookup(title, cleanKey) }.getOrNull()
+        val result = runCatching { lookup(title, cleanKey, includeCast) }.getOrNull()
         synchronized(cache) { cache[cacheKey] = result }
         result
     }
 
-    private fun lookup(title: String, key: String): ProgramMetadata? {
+    private fun lookup(title: String, key: String, includeCast: Boolean): ProgramMetadata? {
         val encoded = URLEncoder.encode(title, "UTF-8")
         val movieSearch = request("https://api.themoviedb.org/3/search/movie?api_key=$key&language=it-IT&query=$encoded")
         val tvSearch = request("https://api.themoviedb.org/3/search/tv?api_key=$key&language=it-IT&query=$encoded")
@@ -53,7 +53,7 @@ object TmdbMetadataRepository {
         val detailPath = if (isTv) "tv/$id" else "movie/$id"
         val details = request("https://api.themoviedb.org/3/$detailPath?api_key=$key&language=it-IT")
         val creditsPath = if (isTv) "tv/$id/aggregate_credits" else "movie/$id/credits"
-        val credits = request("https://api.themoviedb.org/3/$creditsPath?api_key=$key&language=it-IT")
+        val credits = if (includeCast) request("https://api.themoviedb.org/3/$creditsPath?api_key=$key&language=it-IT") else null
         val posterPath = details?.optString("poster_path").orEmpty()
         val rating = details?.optDouble("vote_average")?.takeIf { it > 0.0 && !it.isNaN() }
         val voteCount = details?.optInt("vote_count", 0) ?: 0
