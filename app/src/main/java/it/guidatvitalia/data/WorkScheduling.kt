@@ -9,12 +9,14 @@ import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
 
 object WorkScheduling {
-    fun scheduleEpgRefresh(context: Context) {
+    fun scheduleEpgRefresh(context: Context, intervalHours: Int = 12) {
+        val interval = intervalHours.coerceIn(6, 24)
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
-        val request = PeriodicWorkRequestBuilder<EpgRefreshWorker>(12, TimeUnit.HOURS)
+        val request = PeriodicWorkRequestBuilder<EpgRefreshWorker>(interval.toLong(), TimeUnit.HOURS)
             .setConstraints(constraints)
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "epg_refresh_12h", ExistingPeriodicWorkPolicy.UPDATE, request)
+            "epg_refresh", ExistingPeriodicWorkPolicy.UPDATE, request
+        )
     }
 }
