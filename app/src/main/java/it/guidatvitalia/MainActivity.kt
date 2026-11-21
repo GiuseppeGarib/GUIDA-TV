@@ -155,7 +155,7 @@ private fun GuidaTvApp() {
         val now = System.currentTimeMillis()
         data.channels.map { channel ->
             val programs = data.programs.asSequence().filter { it.channelId == channel.id }.sortedBy { it.startMillis }.toList()
-            ChannelView(channel, channelNumber(channel.name),
+            ChannelView(channel, FreeToAirFilter.lcnFor(channel),
                 programs.firstOrNull { it.startMillis <= now && (it.stopMillis ?: Long.MAX_VALUE) > now },
                 programs.firstOrNull { it.startMillis > now })
         }.sortedWith(compareBy<ChannelView> { it.number }.thenBy { it.channel.name })
@@ -175,7 +175,7 @@ private fun GuidaTvApp() {
     val now = clockNow
     val currentPrograms = remember(epg, now / 60_000) {
         epg?.programs.orEmpty().filter { it.startMillis <= now && (it.stopMillis ?: Long.MAX_VALUE) > now }
-            .sortedBy { channelsById[it.channelId]?.name?.let(::channelNumber) ?: 9999 }
+            .sortedBy { channelsById[it.channelId]?.let(FreeToAirFilter::lcnFor) ?: 9999 }
     }
     val selectedDayPrograms = remember(epg, selectedDate) {
         val start = dayBounds(selectedDate).first + TimeUnit.HOURS.toMillis(6)
