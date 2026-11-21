@@ -53,29 +53,6 @@ private val lcn = mapOf(
     "rai premium" to 25, "rai news 24" to 48
 )
 private const val DEFAULT_EPG_URL = "https://epgshare01.online/epgshare01/epg_ripper_IT1.xml.gz"
-
-// Lista prudenziale dei canali italiani in chiaro riconosciuti.
-private val freeToAirChannelIds = setOf(
-    "20", "27", "boing", "canale5", "cartoonito", "cielo", "cine34",
-    "dmax", "focus", "foodnetwork", "frisbee", "giallo", "hgtv",
-    "iris", "italia1", "k2", "la5", "la7", "la7cinema", "la7d",
-    "mediasetextra", "motortrend", "nove", "qvc", "rai1", "rai2",
-    "rai3", "rai4", "rai5", "raigulp", "raimovie", "rainews24",
-    "raipremium", "raisc uola", "raisc uola", "raiscuola", "raisport",
-    "raistoria", "raiyoyo", "realtime", "rete4", "sanmarinortv",
-    "sportitalia", "super", "supertennis", "topcrime", "tv8",
-    "warnertv", "tgcom", "tg24primopiano"
-).map(::normalize).toSet()
-
-private fun isFreeToAir(channel: EpgChannel): Boolean {
-    fun variants(value: String): Set<String> {
-        val base = normalize(value).removeSuffix("it")
-        val noHd = base.replace(Regex("hd\\d*$"), "")
-        val noLcn = noHd.replace(Regex("\\d{3}$"), "")
-        return setOf(base, noHd, noLcn)
-    }
-    return (variants(channel.name) + variants(channel.id)).any { it in freeToAirChannelIds }
-}
 private fun formatTime(ms: Long): String = SimpleDateFormat("HH:mm", Locale.ITALY).format(Date(ms))
 private fun normalize(s: String) = s.lowercase(Locale.ITALY).replace(Regex("[^a-z0-9]"), "")
 
@@ -116,7 +93,7 @@ private fun GuidaTvApp() {
         val cached = EpgCache(context).use { it.read() }
         if (cached.channels.isNotEmpty()) {
             epg = cached
-            status = "Archivio offline · ${cached.channels.count(::isFreeToAir)} canali in chiaro"
+            status = "Archivio offline · ${cached.channels.size} canali in chiaro"
         } else status = "Scaricamento del primo palinsesto…"
         if (sourceUrl.isNotBlank()) {
             prefs.edit().putString("epg_url", sourceUrl).apply()
@@ -136,7 +113,7 @@ private fun GuidaTvApp() {
                 epg = data
                 prefs.edit().putLong("last_epg_update", System.currentTimeMillis()).apply()
                 WorkScheduling.scheduleEpgRefresh(context)
-                status = "Aggiornati ${data.channels.size} canali · ${data.programs.size} programmi"
+                status = "Aggiornati ${data.channels.size} canali in chiaro · ${data.programs.size} programmi"
             } catch (e: Exception) {
                 status = "Aggiornamento non riuscito: ${e.message ?: "errore sconosciuto"}"
             } finally { loading = false }
@@ -147,7 +124,7 @@ private fun GuidaTvApp() {
         val data = epg
         if (data == null) emptyList() else {
             val now = System.currentTimeMillis()
-            data.channels.filter(::isFreeToAir).map { ch ->
+            data.channels.map { ch ->
                 val programs = data.programs.filter { it.channelId == ch.id }
                 val current = programs.firstOrNull { it.startMillis <= now && (it.stopMillis ?: Long.MAX_VALUE) > now }
                 val next = programs.firstOrNull { it.startMillis > now }
