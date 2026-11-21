@@ -112,7 +112,6 @@ private fun GuidaTvApp() {
         mutableStateOf(prefs.getString("theme_mode", null) ?: if (prefs.getBoolean("dark", false)) "dark" else "system")
     }
     var sourceUrl by remember { mutableStateOf((prefs.getString("epg_url", null) ?: DEFAULT_EPG_URL).ifBlank { DEFAULT_EPG_URL }) }
-    var tmdbApiKey by remember { mutableStateOf(prefs.getString("tmdb_api_key", "").orEmpty()) }
     var sourceDraft by remember { mutableStateOf(sourceUrl) }
     var eveningTime by remember { mutableIntStateOf(prefs.getInt("evening_hour", 20)) }
     var refreshInterval by remember { mutableIntStateOf(prefs.getInt("refresh_hours", 12)) }
@@ -300,7 +299,6 @@ private fun GuidaTvApp() {
                         onProgram = { channel, program -> selectedChannel = channel; selectedProgram = program })
                     Screen.SETTINGS -> SettingsScreen(
                         sourceDraft = sourceDraft, onSource = { sourceDraft = it },
-                        tmdbApiKey = tmdbApiKey, onTmdbApiKey = { tmdbApiKey = it; prefs.edit().putString("tmdb_api_key", it.trim()).apply() },
                         themeMode = themeMode, onTheme = {
                             themeMode = it; prefs.edit().putString("theme_mode", it).apply()
                         },
@@ -406,7 +404,7 @@ private fun ChannelRow(item: ChannelView, favorite: Boolean, onFavorite: () -> U
                 Modifier.width(34.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ChannelLogo(item.channel, Modifier.size(25.dp))
+                    ChannelLogo(item.channel, Modifier.size(42.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(item.channel.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
@@ -475,7 +473,7 @@ private fun TimelineScreen(
                         Text(if (channel.number < 1000) channel.number.toString() else "·",
                             fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            ChannelLogo(channel.channel, Modifier.size(20.dp))
+                            ChannelLogo(channel.channel, Modifier.size(32.dp))
                             Spacer(Modifier.width(3.dp))
                             Text(channel.channel.name, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
@@ -602,7 +600,7 @@ private fun ProgramRow(
                 Text(timeText(program.startMillis), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text(SimpleDateFormat("EEE d MMM", Locale.ITALY).format(Date(program.startMillis)), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ChannelLogo(channel, Modifier.size(18.dp))
+                    ChannelLogo(channel, Modifier.size(30.dp))
                     Spacer(Modifier.width(3.dp))
                     Text(channel.name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                 }
@@ -640,7 +638,7 @@ private fun ProgramDetailsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ChannelLogo(channel, Modifier.size(25.dp))
+                    ChannelLogo(channel, Modifier.size(38.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("${channel.name} · ${SimpleDateFormat("EEEE d MMMM", Locale.ITALY).format(Date(program.startMillis))} · ${timeText(program.startMillis)} – ${program.stopMillis?.let(::timeText) ?: "orario non disponibile"}",
                         fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
@@ -666,7 +664,6 @@ private fun ProgramDetailsDialog(
 @Composable
 private fun SettingsScreen(
     sourceDraft: String, onSource: (String) -> Unit,
-    tmdbApiKey: String, onTmdbApiKey: (String) -> Unit,
     themeMode: String, onTheme: (String) -> Unit,
     eveningTime: Int, onEveningTime: (Int) -> Unit,
     refreshInterval: Int, onRefreshInterval: (Int) -> Unit,
@@ -683,11 +680,9 @@ private fun SettingsScreen(
             }
             HorizontalDivider()
             Text("LOCANDINE, VOTI E CAST", Modifier.padding(top = 12.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Text("Inserisci la tua chiave API gratuita TMDB. L'app mostrerà il voto medio degli utenti e, quando disponibili, locandine e informazioni sul cast. Il voto è distinto da quello della critica professionale.",
+            Text("Le schede si aggiornano automaticamente senza registrazione né chiavi API: TVmaze per serie TV, locandine, voti medi e cast; Wikipedia per descrizioni, immagini e biografie. La disponibilità dipende dal titolo.",
                 Modifier.padding(vertical = 6.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(value = tmdbApiKey, onValueChange = onTmdbApiKey, modifier = Modifier.fillMaxWidth(),
-                label = { Text("Chiave API TMDB") }, singleLine = true)
-            Text("La chiave viene conservata nelle impostazioni locali del dispositivo e non viene pubblicata nel repository. Dati e immagini sono forniti da TMDB e Wikipedia. This product uses the TMDB API but is not endorsed or certified by TMDB.",
+            Text("Fonti: TVmaze (licenza CC BY-SA) e Wikipedia/Wikimedia. Il voto TVmaze è una valutazione degli utenti, non un giudizio della critica.",
                 Modifier.padding(vertical = 5.dp), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             HorizontalDivider()
             Text("PALINSESTI XMLTV", Modifier.padding(top = 12.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -717,14 +712,35 @@ private fun SettingsScreen(
 
 @Composable
 private fun ChannelLogo(channel: EpgChannel, modifier: Modifier = Modifier) {
-    if (!channel.icon.isNullOrBlank()) {
-        AsyncImage(model = channel.icon, contentDescription = "Logo ${channel.name}",
-            modifier = modifier.clip(RoundedCornerShape(5.dp)), contentScale = ContentScale.Fit)
-    } else {
-        Box(modifier.clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
-            contentAlignment = Alignment.Center) {
-            Text(channel.name.take(2).uppercase(Locale.ITALY), fontSize = 8.sp,
-                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+    var failed by remember(channel.id, channel.icon) { mutableStateOf(false) }
+    Box(
+        modifier.clip(RoundedCornerShape(9.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!channel.icon.isNullOrBlank() && !failed) {
+            AsyncImage(
+                model = channel.icon,
+                contentDescription = "Logo ${channel.name}",
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))
+                    .background(Color.White),
+                contentScale = ContentScale.Fit,
+                onError = { failed = true }
+            )
+        } else {
+            Box(
+                Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    channel.name.filter { it.isLetterOrDigit() }.take(3).uppercase(Locale.ITALY),
+                    fontSize = 12.sp, fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1
+                )
+            }
         }
     }
 }
@@ -736,68 +752,84 @@ private fun ProgramMetadataStrip(
     includeCast: Boolean = false
 ) {
     val context = LocalContext.current
-    val apiKey = remember {
-        context.getSharedPreferences("guida_tv", Context.MODE_PRIVATE)
-            .getString("tmdb_api_key", "").orEmpty()
-    }
-    var metadata by remember(program.title, apiKey, includeCast) {
+    var metadata by remember(program.title, includeCast) {
         mutableStateOf<ProgramMetadata?>(null)
     }
-    var loaded by remember(program.title, apiKey, includeCast) { mutableStateOf(false) }
-    LaunchedEffect(program.title, apiKey, includeCast) {
-        if (apiKey.isNotBlank()) {
-            metadata = TmdbMetadataRepository.find(program.title, apiKey, includeCast)
-        }
+    var loaded by remember(program.title, includeCast) { mutableStateOf(false) }
+    LaunchedEffect(program.title, includeCast) {
+        metadata = FreeProgramMetadataRepository.find(program.title, includeCast)
         loaded = true
     }
     if (metadata != null) {
         val data = metadata!!
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             data.posterUrl?.let { poster ->
-                AsyncImage(model = poster, contentDescription = "Locandina ${program.title}",
-                    modifier = Modifier.width(if (compact) 42.dp else 94.dp)
-                        .height(if (compact) 60.dp else 138.dp).clip(RoundedCornerShape(6.dp)),
-                    contentScale = ContentScale.Crop)
+                AsyncImage(
+                    model = poster,
+                    contentDescription = "Locandina ${program.title}",
+                    modifier = Modifier.width(if (compact) 48.dp else 104.dp)
+                        .height(if (compact) 68.dp else 150.dp)
+                        .clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentScale = ContentScale.Crop
+                )
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (data.rating != null) {
-                    Text("★ ${"%.1f".format(Locale.ITALY, data.rating)} / 10 · ${data.voteCount} voti utenti TMDB",
-                        fontSize = if (compact) 9.sp else 11.sp, fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.secondary)
+                    Text(
+                        "★ ${"%.1f".format(Locale.ITALY, data.rating)} / 10 · voto utenti TVmaze",
+                        fontSize = if (compact) 10.sp else 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
                 } else {
-                    Text("Voto utenti non disponibile", fontSize = 9.sp,
+                    Text("Valutazione non disponibile", fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (includeCast) {
-                    Text("CAST PRINCIPALE", fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    data.overview?.let {
+                        Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text("CAST PRINCIPALE", fontSize = 11.sp, fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary)
                     if (data.cast.isEmpty()) {
-                        Text("Cast non disponibile per questo titolo.", fontSize = 10.sp)
+                        Text("Cast non disponibile per questa scheda.", fontSize = 11.sp)
                     } else {
                         data.cast.forEach { actor ->
-                            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                                Text(actor.name + actor.character.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty(),
-                                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                actor.biography?.let { Text(it, fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                                actor.wikipediaUrl?.let { link ->
-                                    TextButton(onClick = {
-                                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))) }
-                                    }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
-                                        Text("Scheda Wikipedia", fontSize = 10.sp)
+                            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                actor.imageUrl?.let { image ->
+                                    AsyncImage(model = image, contentDescription = actor.name,
+                                        modifier = Modifier.size(42.dp).clip(RoundedCornerShape(6.dp)),
+                                        contentScale = ContentScale.Crop)
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                    Text(actor.name + actor.character.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty(),
+                                        fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    actor.biography?.let {
+                                        Text(it, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    actor.wikipediaUrl?.let { link ->
+                                        TextButton(onClick = {
+                                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))) }
+                                        }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
+                                            Text("Scheda Wikipedia", fontSize = 10.sp)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
+                data.sourceUrl?.let { link ->
+                    TextButton(onClick = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))) }
+                    }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
+                        Text("Fonte: ${data.sourceName}", fontSize = 10.sp)
+                    }
+                }
             }
         }
-    } else if (includeCast && loaded && apiKey.isBlank()) {
-        Text("Per locandine, voti e cast, inserisci la chiave API TMDB nelle Impostazioni.",
-            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     } else if (includeCast && loaded) {
-        Text("Nessuna scheda TMDB disponibile per questo programma.",
+        Text("Scheda aggiuntiva non disponibile per questo programma. Restano visibili le informazioni del palinsesto.",
             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
