@@ -29,6 +29,37 @@ class FreeToAirFilterTest {
     }
 
     @Test
+    fun keepsOnlyOneBroadcasterForEachNationalLcn() {
+        val input = EpgData(
+            channels = listOf(
+                EpgChannel("20", "20 Mediaset"),
+                EpgChannel("20mediaset.it", "20 HD"),
+                EpgChannel("27", "27"),
+                EpgChannel("twentyseven", "Twentyseven")
+            ),
+            programs = listOf(
+                EpgProgram("20", "Programma A", null, null, 1L, 2L),
+                EpgProgram("20mediaset.it", "Programma B", null, null, 2L, 3L),
+                EpgProgram("27", "Programma C", null, null, 3L, 4L),
+                EpgProgram("twentyseven", "Programma D", null, null, 4L, 5L)
+            )
+        )
+        val filtered = FreeToAirFilter.apply(input)
+        assertEquals(1, filtered.channels.count { FreeToAirFilter.lcnFor(it) == 20 })
+        assertEquals(1, filtered.channels.count { FreeToAirFilter.lcnFor(it) == 27 })
+        assertEquals(filtered.channels.map { it.id }.toSet(), filtered.programs.map { it.channelId }.toSet())
+    }
+
+    @Test
+    fun keepsDistinctUnnumberedLocalBroadcasters() {
+        val filtered = FreeToAirFilter.apply(EpgData(
+            channels = listOf(EpgChannel("telecolor", "Telecolor"), EpgChannel("telecity", "Telecity")),
+            programs = emptyList()
+        ))
+        assertEquals(2, filtered.channels.size)
+    }
+
+    @Test
     fun recognizesChannelByIdWhenDisplayNameIsDifferent() {
         val input = EpgData(
             channels = listOf(EpgChannel("rai2.it", "Nome non riconosciuto")),
