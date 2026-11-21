@@ -503,7 +503,7 @@ private fun SearchScreen(
             item { SectionHeading("RISULTATI", if (query.length < 2) "inserisci almeno 2 caratteri" else "${results.size} trovati") }
             if (query.length >= 2 && results.isEmpty()) item { EmptyMessage("Nessun programma corrispondente alla ricerca.") }
             items(results, key = { programKey(it) }) { p ->
-                channels[p.channelId]?.let { channel -> ProgramRow(p, channel, System.currentTimeMillis()) { onProgram(channel, p) } }
+                channels[p.channelId]?.let { channel -> ProgramRow(p, channel, System.currentTimeMillis(), onClick = { onProgram(channel, p) }) }
             }
         }
     }
@@ -522,7 +522,7 @@ private fun FavoritesScreen(
         if (selected.isEmpty()) item { EmptyMessage("Aggiungi un canale ai preferiti dalla Guida.") }
         items(selected, key = { "ch:${it.channel.id}" }) {
             ChannelRow(it, true, { onChannelFavorite(it.channel) }) {
-                (it.current ?: it.next)?.let { p -> onProgram(it.channel to p) }
+                (it.current ?: it.next)?.let { p -> onProgram(it.channel, p) }
             }
         }
         item { SectionHeading("PROGRAMMI PREFERITI", "${favoritePrograms.size}") }
