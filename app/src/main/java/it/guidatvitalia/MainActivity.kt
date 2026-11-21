@@ -11,6 +11,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -122,7 +123,8 @@ private fun GuidaTvApp() {
             loading = true
             status = "Download del palinsesto in corso…"
             try {
-                val data = EpgSourceRepository().download(url.trim())
+                val downloaded = EpgSourceRepository().download(url.trim())
+                val data = FreeToAirFilter.apply(downloaded)
                 withContext(Dispatchers.IO) { EpgCache(context).use { it.replace(data) } }
                 epg = data
                 prefs.edit().putLong("last_epg_update", System.currentTimeMillis()).apply()
@@ -141,8 +143,8 @@ private fun GuidaTvApp() {
     LaunchedEffect(Unit) {
         val cached = withContext(Dispatchers.IO) { EpgCache(context).use { it.read() } }
         if (cached.channels.isNotEmpty()) {
-            epg = cached
-            status = "Archivio locale · ${cached.channels.size} canali in chiaro"
+            epg = FreeToAirFilter.apply(cached)
+            status = "Archivio locale · ${FreeToAirFilter.apply(cached).channels.size} canali in chiaro"
         } else status = "Nessun archivio locale: scarico il primo palinsesto…"
         prefs.edit().putString("epg_url", sourceUrl).apply()
         WorkScheduling.scheduleEpgRefresh(context)
@@ -408,7 +410,6 @@ private fun ChannelRow(item: ChannelView, favorite: Boolean, onFavorite: () -> U
                     Spacer(Modifier.width(6.dp))
                     Text(item.channel.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
-                (item.current ?: item.next)?.let { ProgramMetadataStrip(it, compact = true) }
                 if (item.current != null) {
                     Text("${timeText(item.current.startMillis)}  ${item.current.title}",
                         fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -606,7 +607,6 @@ private fun ProgramRow(
                 }
             }
             Column(Modifier.weight(1f)) {
-                ProgramMetadataStrip(program, compact = true)
                 Text(program.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 program.category?.takeIf { it.isNotBlank() }?.let {
                     Text(it, fontSize = 9.sp, color = MaterialTheme.colorScheme.primary)
@@ -636,7 +636,10 @@ private fun ProgramDetailsDialog(
         onDismissRequest = onDismiss,
         title = { Text(program.title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Column(
+                Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ChannelLogo(channel, Modifier.size(38.dp))
                     Spacer(Modifier.width(6.dp))
@@ -715,7 +718,8 @@ private fun ChannelLogo(channel: EpgChannel, modifier: Modifier = Modifier) {
     var failed by remember(channel.id, channel.icon) { mutableStateOf(false) }
     Box(
         modifier.clip(RoundedCornerShape(9.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(9.dp))
             .padding(3.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -760,7 +764,13 @@ private fun ProgramMetadataStrip(
         metadata = FreeProgramMetadataRepository.find(program.title, includeCast)
         loaded = true
     }
-    if (metadata != null) {
+    if (!loaded && includeCast) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            Text("Caricamento scheda, locandina e cast…", fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    } else if (metadata != null) {
         val data = metadata!!
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             data.posterUrl?.let { poster ->
@@ -829,8 +839,15 @@ private fun ProgramMetadataStrip(
             }
         }
     } else if (includeCast && loaded) {
-        Text("Scheda aggiuntiva non disponibile per questo programma. Restano visibili le informazioni del palinsesto.",
+        Text("Scheda estesa non presente negli archivi gratuiti. Le informazioni del palinsesto restano disponibili qui sopra.",
             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val searchUrl = "https://it.wikipedia.org/w/index.php?search=" +
+            java.net.URLEncoder.encode(program.title, "UTF-8")
+        TextButton(onClick = {
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(searchUrl))) }
+        }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
+            Text("Cerca una scheda per questo titolo")
+        }
     }
 }
 
