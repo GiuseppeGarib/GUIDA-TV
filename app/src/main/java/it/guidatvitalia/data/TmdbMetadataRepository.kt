@@ -73,7 +73,7 @@ object TmdbMetadataRepository {
                 cast += CastMember(name, role, bio, wiki)
             }
         }
-        ProgramMetadata(
+        return ProgramMetadata(
             posterUrl = posterPath.takeIf { it.isNotBlank() }?.let { "https://image.tmdb.org/t/p/w342$it" },
             rating = rating,
             voteCount = voteCount,
