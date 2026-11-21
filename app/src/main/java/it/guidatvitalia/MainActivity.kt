@@ -24,16 +24,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import it.guidatvitalia.data.EpgChannel
-import it.guidatvitalia.data.EpgProgram
-import it.guidatvitalia.data.EpgSourceRepository
-import it.guidatvitalia.data.EpgData
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import it.guidatvitalia.data.*
+import it.guidatvitalia.notifications.ReminderWorker
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 private data class TvChannel(
     val number: Int, val id: String, val name: String, val category: String,
@@ -42,8 +45,8 @@ private data class TvChannel(
 private val lcn = mapOf(
     "rai 1" to 1, "rai 2" to 2, "rai 3" to 3, "rete 4" to 4,
     "canale 5" to 5, "italia 1" to 6, "la7" to 7, "tv8" to 8, "nove" to 9,
-    "20" to 20, "rai 4" to 21, "rai news 24" to 24, "rai 5" to 23,
-    "rai movie" to 24, "rai premium" to 25, "rai storia" to 54
+    "20" to 20, "rai 4" to 21, "rai 5" to 23, "rai movie" to 24,
+    "rai premium" to 25, "rai news 24" to 48
 )
 private val demoChannels = listOf(
     TvChannel(1,"","Rai 1","Generalista"), TvChannel(2,"","Rai 2","Generalista"),
@@ -72,13 +75,14 @@ private fun GuidaTvApp() {
     var selectedTab by remember { mutableStateOf(0) }
     var showSettings by remember { mutableStateOf(false) }
     var selectedChannel by remember { mutableStateOf<TvChannel?>(null) }
-    var favorites by remember { mutableStateOf(setOf<Int>()) }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var favorites by remember { mutableStateOf(prefs.getStringSet("favorites", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()) }
     var darkMode by remember { mutableStateOf(prefs.getBoolean("dark", false)) }
     var sourceUrl by remember { mutableStateOf(prefs.getString("epg_url", "") ?: "") }
     var sourceDraft by remember { mutableStateOf(sourceUrl) }
     var epg by remember { mutableStateOf<EpgData?>(null) }
     var loading by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("Nessun palinsesto caricato") }
+    var status by remember { mutableStateOf("Caricamento archivio locale…") }
     val scheme = if (darkMode) darkColorScheme(
         primary = Color(0xFF80CBC4), secondary = Color(0xFFFFB74D),
         surface = Color(0xFF171A1D), background = Color(0xFF101316)
@@ -87,14 +91,26 @@ private fun GuidaTvApp() {
         surface = Color.White, background = Color(0xFFF3F5F6)
     )
 
+    LaunchedEffect(Unit) {
+        val cached = EpgCache(context).use { it.read() }
+        if (cached.channels.isNotEmpty()) {
+            epg = cached
+            status = "Archivio offline · ${cached.channels.size} canali · ${cached.programs.size} programmi"
+        } else status = "Nessun palinsesto: configura una sorgente XMLTV"
+        if (sourceUrl.isNotBlank()) WorkScheduling.scheduleEpgRefresh(context)
+    }
+
     fun refreshEpg(url: String) {
-        if (url.isBlank()) { status = "Inserisci prima un indirizzo XMLTV nelle impostazioni"; return }
+        if (url.isBlank()) { status = "Inserisci un indirizzo XMLTV nelle impostazioni"; return }
         scope.launch {
             loading = true
             status = "Scaricamento palinsesto…"
             try {
                 val data = EpgSourceRepository().download(url.trim())
+                EpgCache(context).use { it.replace(data) }
                 epg = data
+                prefs.edit().putLong("last_epg_update", System.currentTimeMillis()).apply()
+                WorkScheduling.scheduleEpgRefresh(context)
                 status = "Aggiornati ${data.channels.size} canali · ${data.programs.size} programmi"
             } catch (e: Exception) {
                 status = "Aggiornamento non riuscito: ${e.message ?: "errore sconosciuto"}"
@@ -110,8 +126,8 @@ private fun GuidaTvApp() {
                 val programs = data.programs.filter { it.channelId == ch.id }
                 val current = programs.firstOrNull { it.startMillis <= now && (it.stopMillis ?: Long.MAX_VALUE) > now }
                 val next = programs.firstOrNull { it.startMillis > now }
-                val normalized = normalize(ch.name)
-                val number = lcn.entries.firstOrNull { normalize(it.key) == normalized }?.value ?: (1000 + ch.name.hashCode().and(0x3fff))
+                val number = lcn.entries.firstOrNull { normalize(it.key) == normalize(ch.name) }?.value
+                    ?: (1000 + ch.name.hashCode().and(0x3fff))
                 TvChannel(number, ch.id, ch.name, current?.category ?: "Televisione", current, next)
             }.sortedBy { it.number }
         }
@@ -167,7 +183,8 @@ private fun GuidaTvApp() {
                 val filtered = channels.filter {
                     (selectedTab == 0 || it.number in favorites) &&
                     (it.name.contains(query, true) || it.current?.title?.contains(query, true) == true ||
-                        it.next?.title?.contains(query, true) == true)
+                        it.next?.title?.contains(query, true) == true ||
+                        epg?.programs?.any { p -> p.channelId == it.id && p.title.contains(query, true) } == true)
                 }
                 LazyColumn(contentPadding = PaddingValues(bottom = 12.dp)) {
                     items(filtered, key = { it.id.ifBlank { it.number.toString() } }) { channel ->
@@ -175,25 +192,56 @@ private fun GuidaTvApp() {
                             onFavorite = {
                                 favorites = if (channel.number in favorites) favorites - channel.number
                                 else favorites + channel.number
+                                prefs.edit().putStringSet("favorites", favorites.map { it.toString() }.toSet()).apply()
                             },
-                            onClick = { selectedChannel = channel })
+                            onClick = { selectedDate = LocalDate.now(); selectedChannel = channel })
                     }
                 }
             }
         }
 
         selectedChannel?.let { channel ->
-            val schedule = epg?.programs?.filter { it.channelId == channel.id }?.take(12).orEmpty()
+            val zone = ZoneId.systemDefault()
+            val dayStart = selectedDate.atStartOfDay(zone).toInstant().toEpochMilli()
+            val dayEnd = selectedDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val schedule = epg?.programs?.filter {
+                it.channelId == channel.id && it.startMillis >= dayStart && it.startMillis < dayEnd
+            }?.sortedBy { it.startMillis }.orEmpty()
             AlertDialog(onDismissRequest = { selectedChannel = null },
-                title = { Text("${channel.number} · ${channel.name}") },
+                title = { Text("${channel.number.takeIf { it < 1000 } ?: "·"} · ${channel.name}") },
                 text = {
-                    if (schedule.isEmpty()) Text("Nessun programma disponibile per questo canale.")
-                    else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        schedule.forEach { p ->
-                            Column {
-                                Text("${formatTime(p.startMillis)}  ${p.title}", fontWeight = FontWeight.SemiBold)
-                                p.description?.takeIf { it.isNotBlank() }?.let {
-                                    Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()) {
+                            TextButton(onClick = { selectedDate = selectedDate.minusDays(1) }) { Text("‹") }
+                            Text(selectedDate.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ITALY)),
+                                fontWeight = FontWeight.SemiBold)
+                            TextButton(onClick = { selectedDate = selectedDate.plusDays(1) }) { Text("›") }
+                        }
+                        if (schedule.isEmpty()) {
+                            Text("Nessun programma disponibile per questa giornata.")
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items(schedule) { p ->
+                                    Column {
+                                        Text("${formatTime(p.startMillis)}  ${p.title}", fontWeight = FontWeight.SemiBold)
+                                        p.description?.takeIf { it.isNotBlank() }?.let {
+                                            Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        TextButton(onClick = {
+                                            val delayMs = (p.startMillis - System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(5)).coerceAtLeast(0)
+                                            val data = Data.Builder().putString("program_title", p.title)
+                                                .putString("channel_name", channel.name)
+                                                .putInt("notification_id", (p.channelId + p.startMillis).hashCode()).build()
+                                            val request = OneTimeWorkRequestBuilder<ReminderWorker>()
+                                                .setInputData(data).setInitialDelay(delayMs, TimeUnit.MILLISECONDS).build()
+                                            WorkManager.getInstance(context).enqueue(request)
+                                            status = "Promemoria impostato: ${p.title}"
+                                        }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)) {
+                                            Text("Imposta promemoria (5 min prima)")
+                                        }
+                                        HorizontalDivider()
+                                    }
                                 }
                             }
                         }
@@ -219,7 +267,13 @@ private fun GuidaTvApp() {
                         OutlinedTextField(value = sourceDraft, onValueChange = { sourceDraft = it },
                             modifier = Modifier.fillMaxWidth(), placeholder = { Text("https://…/guida.xml o .xml.gz") },
                             singleLine = true)
-                        Text("Usa una sorgente XMLTV HTTPS che sei autorizzato a consultare. La disponibilità pubblica dei dati non implica il diritto di redistribuirli.",
+                        Text("Inserisci una sorgente XMLTV HTTPS che sei autorizzato a consultare. I palinsesti non sono inclusi nell'app: i diritti sui dati dipendono dal fornitore.",
+                            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        prefs.getLong("last_epg_update", 0L).takeIf { it > 0 }?.let {
+                            Text("Ultimo aggiornamento: ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.ITALY).format(Date(it))}",
+                                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("Aggiornamento automatico ogni 12 ore quando è disponibile una connessione.",
                             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
