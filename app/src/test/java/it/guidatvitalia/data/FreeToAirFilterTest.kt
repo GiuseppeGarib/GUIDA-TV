@@ -40,4 +40,31 @@ class FreeToAirFilterTest {
         assertEquals(listOf("rai2.it"), filtered.channels.map { it.id })
         assertEquals(1, filtered.programs.size)
     }
+    @Test
+    fun assignsLcnPositionsAfterSixtyFour() {
+        assertEquals(65, FreeToAirFilter.lcnFor(EpgChannel("almatv", "Alma TV")))
+        assertEquals(66, FreeToAirFilter.lcnFor(EpgChannel("radio105", "Radio 105")))
+        assertEquals(68, FreeToAirFilter.lcnFor(EpgChannel("bomchannel", "BOM Channel")))
+        assertEquals(122, FreeToAirFilter.lcnFor(EpgChannel("canale122", "Canale 122")))
+    }
+
+    @Test
+    fun keepsRecognizedFreeChannelsBeyondSixtyFour() {
+        val input = EpgData(
+            channels = listOf(
+                EpgChannel("almatv", "Alma TV"),
+                EpgChannel("radio105", "Radio 105"),
+                EpgChannel("skycinema", "Sky Cinema")
+            ),
+            programs = listOf(
+                EpgProgram("almatv", "Programma", null, null, 1L, 2L),
+                EpgProgram("radio105", "Musica", null, null, 2L, 3L),
+                EpgProgram("skycinema", "Film", null, null, 3L, 4L)
+            )
+        )
+        val filtered = FreeToAirFilter.apply(input)
+        assertEquals(setOf("almatv", "radio105"), filtered.channels.map { it.id }.toSet())
+        assertEquals(2, filtered.programs.size)
+    }
+
 }
