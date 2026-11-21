@@ -557,8 +557,9 @@ private fun ProgramRow(
     Column {
         Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.width(52.dp)) {
+            Column(Modifier.width(68.dp)) {
                 Text(timeText(program.startMillis), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(SimpleDateFormat("EEE d MMM", Locale.ITALY).format(Date(program.startMillis)), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(channel.name, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }
             Column(Modifier.weight(1f)) {
@@ -592,7 +593,7 @@ private fun ProgramDetailsDialog(
         title = { Text(program.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("${channel.name} · ${timeText(program.startMillis)} – ${program.stopMillis?.let(::timeText) ?: "orario non disponibile"}",
+                Text("${channel.name} · ${SimpleDateFormat("EEEE d MMMM", Locale.ITALY).format(Date(program.startMillis))} · ${timeText(program.startMillis)} – ${program.stopMillis?.let(::timeText) ?: "orario non disponibile"}",
                     fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 program.category?.takeIf { it.isNotBlank() }?.let { Text(it, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp) }
                 program.description?.takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 13.sp) }
