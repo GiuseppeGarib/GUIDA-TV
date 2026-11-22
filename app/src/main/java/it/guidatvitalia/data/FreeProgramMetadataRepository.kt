@@ -81,7 +81,7 @@ object FreeProgramMetadataRepository {
                 )
             }
         }
-        return wikipediaFallback(title)
+        return wikipediaFallback(title) ?: wikidataFallback(title)
     }
 
     private fun readCast(array: JSONArray?): List<CastMember> {
@@ -102,22 +102,52 @@ object FreeProgramMetadataRepository {
     }
 
     private fun wikipediaFallback(title: String): ProgramMetadata? {
+        // Cerca prima Wikipedia italiana, poi inglese per titoli internazionali o
+        // programmi poco documentati in italiano.
+        for (language in listOf("it", "en")) {
+            val encoded = URLEncoder.encode(title, "UTF-8")
+            val search = requestObject("https://$language.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&utf8=1")
+            val first = search?.optJSONObject("query")?.optJSONArray("search")?.optJSONObject(0)
+            val pageTitle = first?.optString("title")?.takeIf { it.isNotBlank() } ?: continue
+            if (!isReasonableMatch(title, pageTitle)) continue
+            val summary = wikipediaSummary(pageTitle, language) ?: continue
+            val extract = summary.optString("extract").takeIf { it.isNotBlank() } ?: continue
+            return ProgramMetadata(
+                posterUrl = summary.optJSONObject("thumbnail")?.optString("source"),
+                rating = null,
+                voteCount = 0,
+                cast = emptyList(),
+                overview = extract.let(::shorten),
+                sourceName = if (language == "it") "Wikipedia Italia" else "Wikipedia English",
+                sourceUrl = summary.optJSONObject("content_urls")?.optJSONObject("desktop")?.optString("page")
+                    ?: "https://$language.wikipedia.org/wiki/" + URLEncoder.encode(pageTitle.replace(' ', '_'), "UTF-8")
+            )
+        }
+        return null
+    }
+
+    private fun wikidataFallback(title: String): ProgramMetadata? {
         val encoded = URLEncoder.encode(title, "UTF-8")
-        val search = requestObject("https://it.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&format=json&utf8=1")
-        val first = search?.optJSONObject("query")?.optJSONArray("search")?.optJSONObject(0)
-        val pageTitle = first?.optString("title")?.takeIf { !it.isNullOrBlank() } ?: return null
-        if (!isReasonableMatch(title, pageTitle)) return null
-        val summary = wikipediaSummary(pageTitle) ?: return null
-        return ProgramMetadata(
-            posterUrl = summary.optJSONObject("thumbnail")?.optString("source"),
-            rating = null,
-            voteCount = 0,
-            cast = emptyList(),
-            overview = summary.optString("extract").takeIf { it.isNotBlank() },
-            sourceName = "Wikipedia",
-            sourceUrl = summary.optJSONObject("content_urls")?.optJSONObject("desktop")?.optString("page")
-                ?: "https://it.wikipedia.org/wiki/" + URLEncoder.encode(pageTitle.replace(' ', '_'), "UTF-8")
-        )
+        val search = requestObject("https://www.wikidata.org/w/api.php?action=wbsearchentities&search=$encoded&language=it&format=json")
+            ?: return null
+        val results = search.optJSONArray("search") ?: return null
+        val candidate = (0 until results.length()).mapNotNull { results.optJSONObject(it) }
+            .firstOrNull { isReasonableMatch(title, it.optString("label")) } ?: return null
+        val entityId = candidate.optString("id")
+        if (!entityId.startsWith("Q")) return null
+        val entity = requestObject("https://www.wikidata.org/wiki/Special:EntityData/$entityId.json")
+            ?.optJSONObject("entities")?.optJSONObject(entityId) ?: return null
+        val descriptions = entity.optJSONObject("descriptions")
+        val description = descriptions?.optJSONObject("it")?.optString("value")
+            ?.takeIf { it.isNotBlank() } ?: descriptions?.optJSONObject("en")?.optString("value")
+                ?.takeIf { it.isNotBlank() }
+        val claims = entity.optJSONObject("claims")
+        val imageFile = claims?.optJSONArray("P18")?.optJSONObject(0)?.optJSONObject("mainsnak")
+            ?.optJSONObject("datavalue")?.optString("value")
+        val imageUrl = imageFile?.let { "https://commons.wikimedia.org/wiki/Special:FilePath/" + URLEncoder.encode(it, "UTF-8") }
+        if (description == null && imageUrl == null) return null
+        return ProgramMetadata(null, null, 0, emptyList(), description,
+            "Wikidata", "https://www.wikidata.org/wiki/$entityId")
     }
 
     private fun wikipediaPerson(name: String): Pair<String, String?>? {
@@ -131,9 +161,9 @@ object FreeProgramMetadataRepository {
         return url to summary?.optString("extract")?.takeIf { it.isNotBlank() }?.let(::shorten)
     }
 
-    private fun wikipediaSummary(title: String): JSONObject? {
+    private fun wikipediaSummary(title: String, language: String = "it"): JSONObject? {
         val encoded = URLEncoder.encode(title.replace(' ', '_'), "UTF-8")
-        return requestObject("https://it.wikipedia.org/api/rest_v1/page/summary/$encoded")
+        return requestObject("https://$language.wikipedia.org/api/rest_v1/page/summary/$encoded")
     }
 
     private fun isReasonableMatch(query: String, result: String): Boolean {
