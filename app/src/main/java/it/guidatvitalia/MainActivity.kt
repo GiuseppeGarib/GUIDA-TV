@@ -365,8 +365,19 @@ private fun programKey(program: EpgProgram) = "${program.channelId}|${program.st
 
 @Composable
 private fun DateSelector(date: LocalDate, onDate: (LocalDate) -> Unit) {
+    val scrollState = rememberScrollState()
+    val density = LocalDensity.current
+    LaunchedEffect(Unit) {
+        // Posiziona "Oggi" al centro della barra all'apertura.
+        scrollState.scrollTo(with(density) { (7 * 82 - 150).dp.roundToPx().coerceAtLeast(0) })
+    }
+    LaunchedEffect(date) {
+        if (date == LocalDate.now()) {
+            scrollState.animateScrollTo(with(density) { (7 * 82 - 150).dp.roundToPx().coerceAtLeast(0) })
+        }
+    }
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
+        Modifier.fillMaxWidth().horizontalScroll(scrollState).padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         (-7L..7L).forEach { offset ->
@@ -728,7 +739,7 @@ private fun ChannelLogo(channel: EpgChannel, modifier: Modifier = Modifier) {
                 model = channel.icon,
                 contentDescription = "Logo ${channel.name}",
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))
-                    .background(Color.White),
+                     .background(Color(0xFF152238)),
                 contentScale = ContentScale.Fit,
                 onError = { failed = true }
             )
