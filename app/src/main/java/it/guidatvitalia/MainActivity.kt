@@ -190,12 +190,29 @@ private fun GuidaTvApp() {
         "light" -> false
         else -> androidx.compose.foundation.isSystemInDarkTheme()
     }
+    // Palette azzurra/ciano: elimina le tonalità violacee e mantiene contrasto in entrambi i temi.
     val colors = if (dark) darkColorScheme(
-        primary = Color(0xFF80CBC4), secondary = Color(0xFFFFB74D),
-        background = Color(0xFF101316), surface = Color(0xFF171A1D)
+        primary = Color(0xFF90CAF9), onPrimary = Color(0xFF003258),
+        primaryContainer = Color(0xFF164B75), onPrimaryContainer = Color(0xFFD6E9FF),
+        secondary = Color(0xFF80DEEA), onSecondary = Color(0xFF00363D),
+        secondaryContainer = Color(0xFF004F59), onSecondaryContainer = Color(0xFFB8F2F8),
+        tertiary = Color(0xFF82B1FF), onTertiary = Color(0xFF002F65),
+        tertiaryContainer = Color(0xFF174A87), onTertiaryContainer = Color(0xFFD8E6FF),
+        background = Color(0xFF0F141A), surface = Color(0xFF151D26),
+        surfaceVariant = Color(0xFF263442), onSurface = Color(0xFFE3EDF7),
+        onSurfaceVariant = Color(0xFFB6C7D8), outline = Color(0xFF7890A5),
+        outlineVariant = Color(0xFF3A5063), error = Color(0xFFFFB4AB)
     ) else lightColorScheme(
-        primary = Color(0xFF00695C), secondary = Color(0xFFEF6C00),
-        background = Color(0xFFF3F5F6), surface = Color.White
+        primary = Color(0xFF1565C0), onPrimary = Color.White,
+        primaryContainer = Color(0xFFD5E8FF), onPrimaryContainer = Color(0xFF00345F),
+        secondary = Color(0xFF0086C3), onSecondary = Color.White,
+        secondaryContainer = Color(0xFFBFEAFF), onSecondaryContainer = Color(0xFF003548),
+        tertiary = Color(0xFF0277BD), onTertiary = Color.White,
+        tertiaryContainer = Color(0xFFD1E8FF), onTertiaryContainer = Color(0xFF00345B),
+        background = Color(0xFFF2F7FC), surface = Color.White,
+        surfaceVariant = Color(0xFFE3EDF6), onSurface = Color(0xFF172533),
+        onSurfaceVariant = Color(0xFF445B70), outline = Color(0xFF71899E),
+        outlineVariant = Color(0xFFC5D5E3), error = Color(0xFFBA1A1A)
     )
 
     MaterialTheme(colorScheme = colors) {
