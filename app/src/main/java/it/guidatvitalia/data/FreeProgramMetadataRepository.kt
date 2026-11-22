@@ -146,7 +146,7 @@ object FreeProgramMetadataRepository {
             ?.optJSONObject("datavalue")?.optString("value")
         val imageUrl = imageFile?.let { "https://commons.wikimedia.org/wiki/Special:FilePath/" + URLEncoder.encode(it, "UTF-8") }
         if (description == null && imageUrl == null) return null
-        return ProgramMetadata(null, null, 0, emptyList(), description,
+        return ProgramMetadata(imageUrl, null, 0, emptyList(), description,
             "Wikidata", "https://www.wikidata.org/wiki/$entityId")
     }
 
